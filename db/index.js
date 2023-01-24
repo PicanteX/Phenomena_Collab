@@ -28,7 +28,7 @@ async function getOpenReports() {
 
     const {rows: [comments],} = await client.query(`
     SELECT * FROM comments
-    WHERE "reportId" IN ${reports.map(report)}
+    WHERE "reportId" IN 
 `);
     // first load all of the reports which are open
     
