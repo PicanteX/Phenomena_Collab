@@ -21,49 +21,45 @@ const client = new Client('postgres://localhost:5432/phenomena-dev');
  */
 async function getOpenReports() {
   try {
-    const {rows: [reports],} = await client.query(`
-    SELECT * FROM reports
-    WHERE "isOpen" = true;
- `);
-
-    const {rows: [comments],} = await client.query(`
-    SELECT * FROM comments
-    WHERE "reportId" IN 
-`);
     // first load all of the reports which are open
-    
-
+    const { rows: report } = await client.query(`
+    SELECT *
+    FROM reports
+    `)
+    const openReports = report.filter(report => {
+      return report.isOpen
+    })
+    const reportIds = report.map(report => report.id).join(',')
+    const { rows: comment } = await client.query(`
+    SELECT *
+    FROM comments
+    WHERE "reportId" IN(${reportIds})`)
+    openReports.map(report => {
+      report.comments = []
+      comment.map(comment => comment.reportId === report.id ? report.comments.push(comment) : null)
+      if (Date.parse(report.expirationDate) >= new Date()) {
+        report.isExpired = false
+      } else if (Date.parse(report.expirationDate) < new Date()) {
+        report.isExpired = true
+      }
+      delete report.password
+    })
     // then load the comments only for those reports, using a
     // WHERE "reportId" IN () clause
-return reports;
-    
     // then, build two new properties on each report:
     // .comments for the comments which go with it
     //    it should be an array, even if there are none
     // .isExpired if the expiration date is before now
     //    you can use Date.parse(report.expirationDate) < new Date()
     // also, remove the password from all reports
-
-
     // finally, return the reports
-  
-
+  return openReports;
   } catch (error) {
     throw error;
   }
 }
 
-/**
- * You should use the reportFields parameter (which is
- * an object with properties: title, location, description, password)
- * to insert a new row into the reports table.
- * 
- * On success, you should return the new report object,
- * and on failure you should throw the error up the stack.
- * 
- * Make sure to remove the password from the report object
- * before returning it.
- */
+
 async function createReport ({
   title, 
   location, 
@@ -142,30 +138,24 @@ async function closeReport(reportId, password) {
   try {
     // First, actually grab the report with that id
   if (!closedReport) {
-    throw error("Report does not exist with that id");
+    throw Error('Report does not exist with that id');
   }
     // If it doesn't exist, throw an error with a useful message
-   if (password !== closedReport.password) {
-    throw error("Password incorrect for this report, please try again")
-   } 
-   if (closedReport.isOpen ===false) {
-    throw error("This report has already been closed")
-   }
-
-   const {rows: [report],} = await client.query(`
+        // If the passwords don't match, throw an error
+  else if (password !== closedReport.password) {
+    throw Error('Password incorrect for this report, please try again');
+  } 
+     // If it has already been closed, throw an error with a useful message
+  else if (closedReport.isOpen === false) {
+    throw Error('This report has already been closed');
+  } else {
+    await client.query(`
       UPDATE reports
-      SET "isOpen" = false
+      SET "isOpen" = 'false'
       WHERE id=${reportId}
       RETURNING *;
-    `,
-  );
-  
-    // If the passwords don't match, throw an error
-    
-
-    // If it has already been closed, throw an error with a useful message
-    
-
+    `);
+   }
     // Finally, update the report if there are no failures, as above
     
   
